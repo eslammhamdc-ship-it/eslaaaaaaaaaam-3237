@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "midway-branch-workspace",
+  "name": "eslaaaaaaaaaam-3237",
   "main": "packages/web/cloudflare/worker.ts",
   "compatibility_date": "2026-11-03",
   "compatibility_flags": ["nodejs_compat"],
