@@ -79,7 +79,7 @@ Deployment/public access and initialization with the real branch manager's crede
 
 The current deployment target is **Cloudflare Workers with static assets and D1**, not Render or Vercel. See [cloudflare/README.md](cloudflare/README.md). Build with `bash deploy/build-cloudflare.sh`; after supplying a real D1 ID and authenticating the target Cloudflare account, deploy with `bash deploy/deploy-cloudflare.sh`.
 
-The D1 ID in wrangler.jsonc is a local placeholder, not a deployed database. No cloud Worker or D1 database has been created. The user must create/connect a free Cloudflare account and a D1 database. Never request secret values in chat; put MIDWAY_SETUP_TOKEN in Worker Secrets. Free-tier storage, reads/writes, CPU and request limits apply; local tests do not establish a free production SLA or actual remote CPU performance.
+The user created the Cloudflare D1 database midway-workspace and its dashboard ID is configured in wrangler.jsonc. No Worker has been deployed and the remote schema has not been initialized or verified. The user must connect the deployment to their Cloudflare account. Never request secret values in chat; put MIDWAY_SETUP_TOKEN in Worker Secrets. Free-tier storage, reads/writes, CPU and request limits apply; local tests do not establish a free production SLA or actual remote CPU performance.
 
 Worker data persists in D1 independently of Worker restarts. Native local data remains in `.midway`, with automatic normalization of old operation snapshots. No automatic account/data upload or cross-runtime password migration is performed. Worker attachments are limited to 1 MiB each and 4 MiB per save. Native Bun limits remain 5/20 MiB. Distinct client companies need isolated deployments and databases.
 

@@ -18,7 +18,7 @@
     {
       "binding": "DB",
       "database_name": "midway-workspace",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "6d1f50a4-d9d0-4236-bbff-e33602e8bab0",
       "migrations_dir": "cloudflare/migrations",
     },
   ],
