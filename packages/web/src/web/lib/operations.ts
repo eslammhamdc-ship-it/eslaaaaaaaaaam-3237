@@ -1,3 +1,4 @@
+import { api } from "./workspace";
 export const statuses = [
   "new",
   "progress",
@@ -80,6 +81,7 @@ export interface RequestRecord {
   history: History[];
 }
 export interface OperationsData {
+  revision?: number;
   employees: Employee[];
   companies: Company[];
   requests: RequestRecord[];
@@ -94,8 +96,8 @@ export interface Filters {
   search: string;
 }
 export const emptyFilters: Filters = {
-  from: "2026-10-01",
-  to: "2026-10-18",
+  from: new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" }).slice(0, 7) + "-01",
+  to: new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" }),
   employee: "",
   company: "",
   service: "",
@@ -384,7 +386,7 @@ function database() {
     req.onblocked = () => reject(new Error("أغلق نوافذ التطبيق الأخرى وأعد المحاولة."));
   }));
 }
-export async function loadData(): Promise<OperationsData> {
+export async function legacyLoadData(): Promise<OperationsData> {
   const db = await database();
   const result = await new Promise<OperationsData | undefined>((resolve, reject) => {
     const q = db.transaction("state").objectStore("state").get("data");
@@ -393,10 +395,10 @@ export async function loadData(): Promise<OperationsData> {
   });
   if (result) return result;
   const initial = seed();
-  await saveData(initial);
+  await legacySaveData(initial);
   return initial;
 }
-export async function saveData(data: OperationsData, files: Attachment[] = []) {
+export async function legacySaveData(data: OperationsData, files: Attachment[] = []) {
   const db = await database();
   return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(["state", "attachments"], "readwrite");
@@ -407,11 +409,48 @@ export async function saveData(data: OperationsData, files: Attachment[] = []) {
     tx.onabort = () => reject(tx.error ?? new Error("تعذر الحفظ"));
   });
 }
-export async function loadAttachment(id: string): Promise<Attachment | undefined> {
+export async function legacyLoadAttachment(id: string): Promise<Attachment | undefined> {
   const db = await database();
   return new Promise((resolve, reject) => {
     const q = db.transaction("attachments").objectStore("attachments").get(id);
     q.onsuccess = () => resolve(q.result);
     q.onerror = () => reject(q.error);
   });
+}
+
+let loadedCompanies: Company[] = [];
+export async function loadData(): Promise<OperationsData> {
+  const data = await api<OperationsData>("/operations");
+  loadedCompanies = structuredClone(data.companies);
+  return data;
+}
+export async function saveData(data: OperationsData, files: Attachment[] = []) {
+  const encoded = await Promise.all(
+    files.map(async (file) => ({
+      ...file,
+      blob: undefined,
+      data: await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1]);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file.blob);
+      }),
+    })),
+  );
+  await api("/operations", {
+    revision: data.revision,
+    requests: data.requests,
+    companies: data.companies.filter(
+      (c) => JSON.stringify(c) !== JSON.stringify(loadedCompanies.find((old) => old.id === c.id)),
+    ),
+    files: encoded,
+  });
+}
+export async function loadAttachment(id: string): Promise<Attachment | undefined> {
+  const r = await fetch("/api/workspace/attachments/" + encodeURIComponent(id));
+  if (!r.ok) throw new Error("تعذر تحميل المرفق أو ليس لديك صلاحية عرضه");
+  const blob = await r.blob();
+  const disposition = r.headers.get("content-disposition") || "";
+  const name = decodeURIComponent(disposition.split("UTF-8''")[1] || "attachment");
+  return { id, requestId: "", name, type: blob.type, size: blob.size, blob, createdAt: "" };
 }

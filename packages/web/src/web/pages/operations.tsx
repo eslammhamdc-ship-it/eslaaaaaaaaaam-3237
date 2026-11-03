@@ -1,3 +1,6 @@
+import BranchOverview from "../components/branch-overview";
+import { Link } from "wouter";
+import { useWorkspace, roleNames } from "../lib/workspace";
 import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
@@ -240,8 +243,10 @@ export default function Operations() {
   const current = navItems.find((n) => n.path === location)?.id ?? "dashboard";
   const [data, setData] = useState<OperationsData>();
   const [loadError, setLoadError] = useState("");
-  const [role, setRole] = useState("manager");
-  const [employeeId, setEmployeeId] = useState("e1");
+  const { user, logout } = useWorkspace();
+  const role = user.role === "employee" ? "employee" : "manager";
+  const employeeId = user.id;
+  const readOnly = user.role === "sales_manager";
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [filterOpen, setFilterOpen] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -257,11 +262,7 @@ export default function Operations() {
     setLoadError("");
     loadData()
       .then(setData)
-      .catch(() =>
-        setLoadError(
-          "تعذر فتح التخزين المحلي. تأكد من السماح بتخزين بيانات المواقع، ثم أعد المحاولة.",
-        ),
-      );
+      .catch(() => setLoadError("تعذر تحميل بيانات الفرع. تحقق من اتصال الخادم ثم أعد المحاولة."));
   };
   useEffect(boot, []);
   useEffect(() => {
@@ -292,10 +293,10 @@ export default function Operations() {
   const go = (id: string) => navigate(navItems.find((n) => n.id === id)?.path ?? "/");
   async function commit(next: OperationsData, files: Attachment[] = []) {
     await saveData(next, files);
-    setData(next);
+    setData(await loadData());
   }
   async function saveRequest(r: RequestRecord, files: Attachment[]) {
-    if (!data) return;
+    if (!data || readOnly) return;
     const exists = data.requests.some((x) => x.id === r.id);
     await commit(
       {
@@ -314,7 +315,9 @@ export default function Operations() {
       });
     else
       setFilters((f) => ({ ...f, company: "", employee: "", service: "", status: "", search: "" }));
-    setToast(exists ? "تم حفظ التعديلات في هذا المتصفح" : "تم تسجيل الطلب وتحديث مؤشرات العمليات");
+    setToast(
+      exists ? "تم حفظ التعديلات في قاعدة بيانات الفرع" : "تم تسجيل الطلب وتحديث مؤشرات العمليات",
+    );
   }
   async function statusChange(status: Status) {
     if (!data || !detail || status === detail.status) return;
@@ -327,7 +330,7 @@ export default function Operations() {
           id: crypto.randomUUID(),
           status,
           time: new Date().toISOString(),
-          actor: role === "manager" ? "مدير الطيران" : (own?.name ?? "موظف"),
+          actor: user.name,
           note: "تحديث حالة الطلب",
         },
       ],
@@ -348,9 +351,17 @@ export default function Operations() {
     });
     setToast("تم حفظ شركة العميل");
   }
-  const canEdit = (r: RequestRecord) => role === "manager" || r.employeeId === employeeId;
+  const canEdit = (r: RequestRecord) =>
+    !readOnly && (role === "manager" || r.employeeId === employeeId);
   const title = {
-    dashboard: role === "manager" ? "لوحة العمليات" : "مساحة العمل الخاصة بي",
+    dashboard:
+      user.role === "branch_manager"
+        ? "لوحة الفرع"
+        : user.role === "sales_manager"
+          ? "المبيعات ونتائج العمليات"
+          : role === "manager"
+            ? "لوحة العمليات"
+            : "مساحة العمل الخاصة بي",
     requests: role === "manager" ? "الطلبات والحجوزات" : "طلباتي والحجوزات",
     companies: "شركات العملاء",
     employees: "فريق الحجوزات",
@@ -397,6 +408,10 @@ export default function Operations() {
           </div>
           <ChevronDown size={14} />
         </div>
+        <div className="workspace-links">
+          <Link href="/crm">العملاء والمتابعات</Link>
+          {user.role === "branch_manager" && <Link href="/team">إدارة الفريق</Link>}
+        </div>
         <span className="nav-caption">مساحة العمليات</span>
         <nav>
           {navItems
@@ -425,9 +440,9 @@ export default function Operations() {
           <div className="demo-card">
             <span>
               <ShieldCheck size={17} />
-              مساحة عرض تجريبية
+              مساحة عمل مشتركة
             </span>
-            <p>بيانات خيالية، دون اتصال بأنظمة الحجز أو شركات الطيران.</p>
+            <p>بيانات الفرع المسجلة؛ لا يوجد إصدار تذاكر مباشر من شركات الطيران.</p>
             <button onClick={() => setInfo(true)}>
               عن هذه النسخة <ArrowUpLeft size={14} />
             </button>
@@ -435,8 +450,8 @@ export default function Operations() {
           <div className="sidebar-user">
             <span className="avatar orange">{role === "manager" ? "م ط" : own?.initials}</span>
             <div>
-              <strong>{role === "manager" ? "مدير الطيران" : own?.name}</strong>
-              <small>{role === "manager" ? "Aviation Manager" : "Reservation Employee"}</small>
+              <strong>{user.name}</strong>
+              <small>{roleNames[user.role]}</small>
             </div>
             <span className="online-dot" />
           </div>
@@ -469,7 +484,7 @@ export default function Operations() {
           <div className="topbar-tools">
             <span className="local-state">
               <i />
-              حفظ محلي
+              متصل بالفرع
             </span>
             <button
               className="icon-button info-button"
@@ -478,45 +493,12 @@ export default function Operations() {
             >
               <Info size={18} />
             </button>
-            <div className="role-control">
-              <span className="demo-label">دور تجريبي</span>
-              <select
-                aria-label="تبديل الدور التجريبي"
-                value={role}
-                onChange={(e) => {
-                  setRole(e.target.value);
-                  setDetailId("");
-                  setEditId("");
-                  setNewRequest(false);
-                  setCompanyDetail("");
-                  setCompanyModal(null);
-                  setFilters({ ...emptyFilters });
-                  go("dashboard");
-                }}
-              >
-                <option value="manager">مدير الطيران</option>
-                <option value="employee">موظف حجوزات</option>
-              </select>
-            </div>
-            {role === "employee" && data && (
-              <select
-                className="employee-switch"
-                aria-label="اختيار الموظف التجريبي"
-                value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-              >
-                {data.employees
-                  .filter((e) => e.active)
-                  .map((e) => (
-                    <option value={e.id} key={e.id}>
-                      {e.name}
-                    </option>
-                  ))}
-              </select>
-            )}
-            <span className={`avatar small ${role === "manager" ? "orange" : own?.color}`}>
-              {role === "manager" ? "م ط" : own?.initials}
-            </span>
+            <Link className="role-name" href="/account">
+              {user.name} · {roleNames[user.role]}
+            </Link>
+            <button className="button secondary" onClick={() => void logout()}>
+              خروج
+            </button>
           </div>
         </header>
         <main>
@@ -532,7 +514,11 @@ export default function Operations() {
               </h1>
               <p>{subtitle}</p>
             </div>
-            <button className="button primary" onClick={() => setNewRequest(true)} disabled={!data}>
+            <button
+              className="button primary"
+              onClick={() => setNewRequest(true)}
+              disabled={!data || readOnly || !data.employees.some((e) => e.active)}
+            >
               <Plus size={18} />
               تسجيل طلب جديد
             </button>
@@ -540,13 +526,21 @@ export default function Operations() {
           <div className="demo-strip">
             <span>
               <Info size={14} />
-              <b>نسخة تجريبية</b> البيانات والمرفقات محفوظة في هذا المتصفح فقط. تبديل الدور ليس نظام
-              صلاحيات.
+              <b>مساحة الفرع</b> بيانات مشتركة وصلاحيات حسب حسابك. تسجيل الطلب لا يصدر تذكرة لدى شركة
+              الطيران.
             </span>
             <button onClick={() => setInfo(true)}>
               التفاصيل <ArrowUpLeft size={13} />
             </button>
           </div>
+          {["branch_manager", "sales_manager"].includes(user.role) && (
+            <BranchOverview data={data} />
+          )}
+          {data && !data.employees.some((e) => e.active) && (
+            <p className="note-box">
+              لا يوجد موظفو طيران نشطون. أضف حسابات الموظفين من إدارة الفريق قبل تسجيل الطلبات.
+            </p>
+          )}
           {!data ? (
             <div className="loading-panel">
               {loadError ? (
@@ -592,23 +586,36 @@ export default function Operations() {
                 <div className="period-presets">
                   <button
                     className={
-                      filters.from === "2026-10-01" && filters.to === "2026-10-18" ? "selected" : ""
+                      filters.from === emptyFilters.from && filters.to === emptyFilters.to
+                        ? "selected"
+                        : ""
                     }
                     onClick={() =>
-                      setFilters((f) => ({ ...f, from: "2026-10-01", to: "2026-10-18" }))
+                      setFilters((f) => ({ ...f, from: emptyFilters.from, to: emptyFilters.to }))
                     }
                   >
-                    هذا الشهر التجريبي
+                    هذا الشهر
                   </button>
                   <button
                     className={
-                      filters.from === "2026-10-12" && filters.to === "2026-10-18" ? "selected" : ""
+                      filters.from ===
+                        new Date(Date.parse(emptyFilters.to) - 6 * 86400000)
+                          .toISOString()
+                          .slice(0, 10) && filters.to === emptyFilters.to
+                        ? "selected"
+                        : ""
                     }
                     onClick={() =>
-                      setFilters((f) => ({ ...f, from: "2026-10-12", to: "2026-10-18" }))
+                      setFilters((f) => ({
+                        ...f,
+                        from: new Date(Date.parse(emptyFilters.to) - 6 * 86400000)
+                          .toISOString()
+                          .slice(0, 10),
+                        to: emptyFilters.to,
+                      }))
                     }
                   >
-                    آخر 7 أيام تجريبية
+                    آخر 7 أيام
                   </button>
                 </div>
                 <div className="filter-actions">
@@ -956,7 +963,11 @@ export default function Operations() {
                           onChange={(e) => setCompanySearch(e.target.value)}
                         />
                       </div>
-                      <button className="button secondary" onClick={() => setCompanyModal("new")}>
+                      <button
+                        className="button secondary"
+                        disabled={readOnly}
+                        onClick={() => setCompanyModal("new")}
+                      >
                         <Plus size={16} />
                         إضافة شركة
                       </button>
@@ -987,6 +998,7 @@ export default function Operations() {
                               <button
                                 className="icon-button"
                                 aria-label={`تعديل ${c.name}`}
+                                disabled={readOnly}
                                 onClick={() => setCompanyModal(c)}
                               >
                                 <SlidersHorizontal size={16} />
@@ -1263,7 +1275,7 @@ export default function Operations() {
                   Midway Flight Operations <i />
                   تسجيل يدوي، رؤية موحدة
                 </span>
-                <span>بيانات خيالية • تخزين محلي غير متزامن</span>
+                <span>بيانات الفرع • حفظ مشترك وصلاحيات حسب الحساب</span>
               </footer>
             </>
           )}
@@ -1298,7 +1310,13 @@ export default function Operations() {
             setEditId(detail.id);
             setDetailId("");
           }}
-          onStatus={statusChange}
+          onStatus={async (status) => {
+            try {
+              await statusChange(status);
+            } catch (e) {
+              setToast((e as Error).message);
+            }
+          }}
         />
       )}
       {data && companyModal && role === "manager" && (
@@ -1354,6 +1372,7 @@ export default function Operations() {
               <div className="modal-footer">
                 <button
                   className="button secondary"
+                  disabled={readOnly}
                   onClick={() => {
                     setCompanyDetail("");
                     setCompanyModal(c);
@@ -1377,50 +1396,22 @@ export default function Operations() {
         })()}
       {info && (
         <Modal
-          title="عن النسخة التجريبية"
-          subtitle="Midway Flight Operations — MVP"
+          title="عن مساحة العمل"
+          subtitle="Midway — إدارة الفرع"
           onClose={() => setInfo(false)}
         >
           <div className="form-body about-content">
-            <div className="about-icon">
-              <ShieldCheck size={30} />
-            </div>
-            <h3>مساحة عمل حقيقية للعرض، وليست نظام حجز مباشرًا</h3>
+            <h3>نظام داخلي للعمليات والعملاء</h3>
             <p>
-              يمكنك تسجيل الطلبات وتعديل حالاتها، إدارة الشركات، معاينة المرفقات، ومراجعة مؤشرات
-              مشتقة من نفس السجلات.
+              يتم حفظ الحسابات والطلبات والمرفقات على خادم الفرع. مدير الفرع يدير الحسابات، ومدير
+              الطيران يدير جميع الطلبات، ومدير المبيعات يطّلع على العمليات ويتابع العملاء، والموظف
+              يعدل طلباته فقط.
             </p>
-            <ul>
-              <li>
-                جميع السجلات الأولية لشركات وموظفين وطلبات خيالية. الفترة الأولية 1–18 أكتوبر 2026.
-              </li>
-              <li>
-                التخزين في IndexedDB داخل هذا المتصفح فقط. يُحفظ بعد إعادة تحميل الصفحة، لكنه لا
-                يتزامن بين الأجهزة أو الموظفين، ويمكن فقده عند مسح بيانات الموقع.
-              </li>
-              <li>
-                المرفقات محلية ولا تُرفع إلى خدمة عامة. لا تدخل أسماء مسافرين أو مستندات سرية حقيقية في
-                العرض.
-              </li>
-              <li>
-                تبديل الدور والموظف تجربة واجهة، وليس مصادقة أو صلاحيات وصول. الموظف يرى طلباته ضمن
-                هذه التجربة فقط.
-              </li>
-              <li>
-                لا توجد اتصالات WhatsApp أو GDS أو شركات طيران؛ إكمال طلب هنا لا يُصدر تذكرة حقيقية.
-              </li>
-              <li>
-                المؤشرات حسب تاريخ إنشاء الطلب وحالته الحالية. التذكرة الصادرة = خدمة طيران جديدة
-                مكتملة. التقارير المالية تستخدم القيم المسجلة للطلبات المكتملة وتفصل العملات.
-              </li>
-            </ul>
-            <div className="next-step">
-              <strong>المرحلة التالية المقترحة</strong>
-              <p>
-                مصادقة فعلية وصلاحيات على الخادم، قاعدة بيانات مشتركة، وتخزين خاص للمستندات قبل إدخال
-                أي بيانات عمل حقيقية.
-              </p>
-            </div>
+            <p>
+              العملاء مشتركون بين قسم العمليات والمتابعات. التقارير المالية تستخدم القيم المسجلة
+              للطلبات المكتملة وتفصل العملات. هذه ليست خدمة إصدار تذاكر أو تحصيل مدفوعات؛ لا توجد
+              اتصالات GDS أو شركات طيران.
+            </p>
           </div>
           <div className="modal-footer">
             <button className="button primary" onClick={() => setInfo(false)}>

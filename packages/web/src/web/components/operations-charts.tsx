@@ -85,7 +85,7 @@ export function VolumeChart({
           className="line-chart"
           viewBox="0 0 735 214"
           aria-label="حجم الطلبات المسجلة والمكتملة حسب تاريخ إنشاء الطلب"
-          dir="ltr"
+          style={{ direction: "ltr" }}
         >
           <defs>
             <linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1">

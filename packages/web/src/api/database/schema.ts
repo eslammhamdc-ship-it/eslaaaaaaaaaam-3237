@@ -1,8 +1,15 @@
-import {} from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, index } from "drizzle-orm/sqlite-core";
 
-/**
- * Define your database schema here, then apply it with `bun run db:push`
- * (from packages/web). Re-export any generated schema from this file
- * (e.g. Better Auth's auth-schema.ts) so drizzle generates complete migrations.
- * Table patterns and conventions: skills/app/references/api.md
- */
+export const records = sqliteTable(
+  "crm_records",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id").notNull(),
+    kind: text("kind").notNull(),
+    companyId: text("company_id"),
+    data: text("data", { mode: "json" }).$type<Record<string, any>>().notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("crm_owner").on(t.ownerId)],
+);

@@ -1,0 +1,163 @@
+.session-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #0a111c;
+  color: #edf4ff;
+}
+.session-card {
+  width: min(480px, 100%);
+  padding: 32px;
+  border: 1px solid #29394d;
+  border-radius: 20px;
+  background: #121e2e;
+}
+.session-card h1 {
+  font-size: 28px;
+  margin: 18px 0;
+}
+.session-card p,
+.portal p {
+  color: #a8bacf;
+  line-height: 1.9;
+}
+.session-card form,
+.session-card label,
+.team-form label,
+.team-grid label {
+  display: grid;
+  gap: 10px;
+}
+.session-card form {
+  gap: 20px;
+}
+.session-card input,
+.portal input,
+.portal select {
+  padding: 12px;
+  background: #0d1725;
+  border: 1px solid #35465d;
+  color: #edf4ff;
+  border-radius: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+.portal {
+  max-width: 1250px;
+  margin: auto;
+  padding: 32px 20px;
+  color: #edf4ff;
+}
+.portal a,
+.workspace-links a {
+  color: #8bd2fa;
+}
+.portal h1 {
+  margin: 24px 0;
+}
+.portal-panel {
+  padding: 24px;
+  background: #121e2e;
+  border: 1px solid #29394d;
+  border-radius: 16px;
+  margin: 20px 0;
+}
+.team-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.team-grid article {
+  padding: 18px;
+  background: #0d1725;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.team-grid form {
+  display: grid;
+  gap: 12px;
+}
+.team-grid input[type="checkbox"] {
+  width: auto;
+}
+.workspace-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+}
+.workspace-links a {
+  padding: 9px 12px;
+  border: 1px solid #35465d;
+  border-radius: 8px;
+  text-decoration: none;
+}
+.branch-overview {
+  padding: 24px;
+  border: 1px solid #35465d;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  background: #111e2f;
+}
+.branch-overview h2 {
+  margin-bottom: 12px;
+}
+.branch-overview .workspace-links {
+  padding: 12px 0;
+}
+.role-name {
+  color: #8bd2fa;
+}
+@media (max-width: 700px) {
+  .team-form,
+  .team-grid {
+    grid-template-columns: 1fr;
+  }
+  .session-card {
+    padding: 24px;
+  }
+  .portal-panel {
+    padding: 16px;
+  }
+  .topbar-tools {
+    gap: 6px;
+  }
+  .role-name {
+    max-width: 140px;
+    font-size: 11px;
+  }
+}
+
+.branch-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.branch-metrics > div {
+  padding: 16px;
+  background: #0a1523;
+  border: 1px solid #29394d;
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+}
+.branch-metrics strong {
+  font-size: 26px;
+  color: #8bd2fa;
+}
+.branch-metrics span {
+  font-size: 12px;
+  color: #a8bacf;
+}
+@media (max-width: 700px) {
+  .branch-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

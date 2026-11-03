@@ -1,5 +1,8 @@
 import type { RouterClient } from "@orpc/server";
 import { createApp } from "./__core/app";
+import workspace from "./workspace";
+import { crm } from "./routes/crm";
+import { planning } from "./routes/planning";
 import { ping } from "./routes/ping";
 
 // API features are oRPC procedures, one file per feature in ./routes/,
@@ -10,6 +13,8 @@ import { ping } from "./routes/ping";
 // Patterns and examples: skills/app/references/api.md
 export const router = {
   ping,
+  crm,
+  planning,
 };
 
 export type AppRouter = typeof router;
@@ -17,6 +22,7 @@ export type AppRouter = typeof router;
 export type AppRouterClient = RouterClient<AppRouter>;
 
 const app = createApp(router);
+app.route("/api/workspace", workspace);
 // Rare plain-HTTP endpoints (webhooks, streaming, the Better Auth handler)
 // register here with full paths, e.g. app.post("/api/webhooks/example", ...)
 

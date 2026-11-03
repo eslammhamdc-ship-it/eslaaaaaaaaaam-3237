@@ -6,10 +6,10 @@
     ".": "./src/api/index.ts"
   },
   "scripts": {
-    "build": "tsc --noEmit && vite build",
+    "build": "bun run typecheck && vite build",
     "dev": "vite",
     "start": "bun src/__server.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "preview": "bun run build && vite preview",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate",
     "db:migrate": "bun --env-file=../../.env drizzle-kit migrate",
@@ -27,6 +27,7 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.10",
+    "leaflet": "1.9.4",
     "lucide-react": "^0.577.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -40,6 +41,7 @@
     "@tailwindcss/vite": "^4.2.1",
     "@types/bun": "latest",
     "@types/jsdom": "^28.0.1",
+    "@types/leaflet": "1.9.22",
     "@types/node": "^25.3.5",
     "@types/react": "19.1.17",
     "@types/react-dom": "19.1.11",

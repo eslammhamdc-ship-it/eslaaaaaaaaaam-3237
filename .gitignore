@@ -72,3 +72,9 @@ scripts/
 !packages/mobile/scripts/
 packages/mobile/scripts/*
 !packages/mobile/scripts/generate-ios-certs.py
+
+# private workspace database and uploaded documents
+.midway/
+
+# hosting build toolchain
+.runtime/

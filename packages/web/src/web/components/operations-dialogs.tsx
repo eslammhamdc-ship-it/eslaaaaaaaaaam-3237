@@ -222,8 +222,8 @@ export function RequestForm({
     try {
       await onSave(record, attachments);
       onClose();
-    } catch {
-      setError("تعذر حفظ الطلب. قد تكون مساحة المتصفح ممتلئة. جرّب تقليل حجم المرفقات.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر حفظ الطلب");
     } finally {
       setSaving(false);
     }
@@ -379,7 +379,7 @@ export function RequestForm({
                     aria-label="مرجع الحجز"
                     name="pnr"
                     defaultValue={initial?.pnr}
-                    placeholder="مرجع تجريبي"
+                    placeholder="مرجع الحجز"
                     maxLength={24}
                   />
                 </label>
@@ -482,7 +482,7 @@ export function RequestForm({
           )}
           <p className="storage-note">
             <AlertCircle size={14} />
-            المرفقات محفوظة في هذا المتصفح فقط، ولا تُرفع إلى خدمة عامة. لا تدخل مستندات سرية حقيقية.
+            المرفقات محفوظة على خادم الفرع، ويمكن للمستخدمين المصرح لهم الاطلاع عليها.
           </p>
           {error && (
             <div role="alert" className="error">
@@ -491,7 +491,7 @@ export function RequestForm({
           )}
         </div>
         <div className="modal-footer">
-          <span className="muted">نموذج تجريبي • دون اتصال بأنظمة الحجز</span>
+          <span className="muted">تسجيل داخلي • دون إصدار تذكرة لدى شركة الطيران</span>
           <button type="button" className="button secondary" disabled={saving} onClick={onClose}>
             إلغاء
           </button>
@@ -517,7 +517,7 @@ function AttachmentView({ id }: { id: string }) {
       .then(async (f) => {
         if (!active) return;
         if (!f) {
-          setError("هذا الملف غير متاح في المتصفح الحالي.");
+          setError("هذا الملف غير متاح أو لم يعد لديك صلاحية عرضه.");
           return;
         }
         setFile(f);
@@ -541,7 +541,7 @@ function AttachmentView({ id }: { id: string }) {
         <Paperclip size={17} />
         <span>
           {file.name}
-          <small>{(file.size / 1024).toFixed(0)} KB • محفوظ محليًا</small>
+          <small>{(file.size / 1024).toFixed(0)} KB • محفوظ في الفرع</small>
         </span>
         <a
           className="icon-button"
@@ -655,7 +655,7 @@ export function RequestDetail({
                 ))}
               </select>
             </label>
-            <p>كل تغيير يُسجَّل باسم الدور التجريبي وتوقيته.</p>
+            <p>كل تغيير يُسجَّل باسم المستخدم الفعلي وتوقيته.</p>
           </div>
         )}
         {error && (
@@ -681,7 +681,7 @@ export function RequestDetail({
         )}
         <p className="storage-note">
           <AlertCircle size={14} />
-          ملفات محلية لهذا المتصفح فقط؛ لا توجد صلاحيات وصول حقيقية في النسخة التجريبية.
+          الوصول للمرفقات محمي بصلاحيات الحساب على الخادم.
         </p>
         <h4>
           <Clock3 size={15} /> سجل النشاط
@@ -751,8 +751,8 @@ export function CompanyForm({
         active: f.get("active") === "true",
       });
       onClose();
-    } catch {
-      setError("تعذر حفظ الشركة في المتصفح.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر حفظ الشركة");
     } finally {
       setSaving(false);
     }
@@ -760,7 +760,7 @@ export function CompanyForm({
   return (
     <Modal
       title={initial ? "تعديل شركة العميل" : "إضافة شركة جديدة"}
-      subtitle="قاعدة عملاء تجريبية — بيانات محلية لهذا المتصفح"
+      subtitle="شركة مشتركة بين العمليات وإدارة العملاء"
       onClose={() => !saving && onClose()}
     >
       <form onSubmit={submit}>
