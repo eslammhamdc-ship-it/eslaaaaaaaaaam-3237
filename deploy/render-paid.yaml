@@ -1,0 +1,28 @@
+# Review hosting charges before creating this service. Nothing is deployed by this file.
+services:
+  - type: web
+    name: midway-branch-workspace
+    runtime: node
+    plan: starter
+    numInstances: 1
+    autoDeploy: false
+    buildCommand: bash deploy/build.sh
+    startCommand: bash deploy/start.sh
+    healthCheckPath: /api/health
+    disk:
+      name: midway-private-data
+      mountPath: /var/data/midway
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: MIDWAY_DATABASE_URL
+        value: file:/var/data/midway/workspace.db
+      - key: MIDWAY_SECURE_COOKIES
+        value: "true"
+      - key: MIDWAY_ALLOW_SETUP
+        value: "true"
+      - key: MIDWAY_SETUP_TOKEN
+        generateValue: true

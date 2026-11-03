@@ -161,3 +161,21 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.demo-notice {
+  margin: 12px 0 24px;
+  padding: 14px 18px;
+  border: 1px solid #d7933e;
+  border-radius: 12px;
+  background: #302416;
+  color: #ffe5b6;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.demo-notice p {
+  margin: 6px 0 0;
+  color: #ffe5b6;
+}
+.session-card .demo-notice {
+  margin: 16px 0;
+}

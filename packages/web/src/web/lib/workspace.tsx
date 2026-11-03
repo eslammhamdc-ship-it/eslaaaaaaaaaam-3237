@@ -27,7 +27,9 @@ export async function api<T = any>(
   if (!response.ok) throw new Error(data.message || "تعذر تنفيذ العملية");
   return data;
 }
-const Context = createContext<{ user: User; logout: () => Promise<void> }>({} as any);
+const Context = createContext<{ user: User; demoMode: boolean; logout: () => Promise<void> }>(
+  {} as any,
+);
 export const useWorkspace = () => useContext(Context);
 export function SessionGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<{
@@ -35,6 +37,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
     needsSetup: boolean;
     setupEnabled: boolean;
     setupTokenRequired: boolean;
+    demoMode: boolean;
   }>();
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -50,6 +53,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
       <Context.Provider
         value={{
           user: state.user,
+          demoMode: state.demoMode,
           logout: async () => {
             await api("/logout", {});
             window.location.assign("/");
@@ -69,6 +73,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
             ? "أنشئ حساب مدير الفرع الأول، ثم أضف المديرين والموظفين من إدارة الفريق."
             : "سجّل الدخول لحسابك؛ مساحة العمل والصلاحيات بتتحدد حسب دورك."}
         </p>
+        {state?.demoMode && <DemoNotice enabled />}
         {!state && !error && <p>جارٍ الاتصال…</p>}
         {error && (
           <p className="form-error" role="alert">
@@ -155,5 +160,19 @@ export function SessionGate({ children }: { children: ReactNode }) {
         )}
       </section>
     </div>
+  );
+}
+
+export function DemoNotice({ enabled }: { enabled?: boolean }) {
+  const context = useWorkspace();
+  if (!(enabled ?? context?.demoMode)) return null;
+  return (
+    <aside className="demo-notice" aria-label="نسخة عرض مؤقتة">
+      <strong>نسخة عرض مجانية مؤقتة</strong>
+      <p>
+        الحسابات والطلبات والمرفقات قد تُفقد عند توقف الخدمة أو إعادة نشرها. استخدم بيانات تجريبية
+        فقط، ويمكن تجهيزها من جديد قبل العرض.
+      </p>
+    </aside>
   );
 }

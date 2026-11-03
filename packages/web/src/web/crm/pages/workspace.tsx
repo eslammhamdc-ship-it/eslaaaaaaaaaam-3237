@@ -1,3 +1,4 @@
+import { DemoNotice } from "../../lib/workspace";
 import { DailyPlan } from "../components/daily-plan";
 import { GeoPlanner } from "../components/geo-planner";
 import { DecisionCenter } from "../components/decision-center";
@@ -1778,6 +1779,7 @@ export default function Workspace() {
           </div>
         </header>
         <main>
+          <DemoNotice />
           <div className="page-heading">
             <div>
               <div className="eyebrow">MIDWAY · FIELD SALES</div>

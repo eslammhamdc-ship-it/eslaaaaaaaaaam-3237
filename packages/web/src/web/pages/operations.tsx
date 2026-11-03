@@ -1,6 +1,6 @@
 import BranchOverview from "../components/branch-overview";
 import { Link } from "wouter";
-import { useWorkspace, roleNames } from "../lib/workspace";
+import { useWorkspace, roleNames, DemoNotice } from "../lib/workspace";
 import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
@@ -502,6 +502,7 @@ export default function Operations() {
           </div>
         </header>
         <main>
+          <DemoNotice />
           <div className="page-heading">
             <div>
               <div className="eyebrow">

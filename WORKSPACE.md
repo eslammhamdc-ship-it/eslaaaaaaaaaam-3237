@@ -74,4 +74,10 @@ Deployment/public access and initialization with the real branch manager's crede
 
 ## Internet hosting
 
-See [deploy/README.md](deploy/README.md) and `render.yaml` for a single-instance Render service with persistent disk. The first-account setup must be protected with `MIDWAY_SETUP_TOKEN` online; enter that token only in the application and hosting settings, never in chat. The production startup script refuses setup without a token. Local development without secure-cookie/production mode can use setup without a token. Hosting charges, actual deployment and remote validation have not been performed. For deployment use the branch containing these changes, `codex/midway-branch-workspace`, after verifying it exists on GitHub.
+The default `render.yaml` selects a **free temporary demonstration** without a paid disk, using `deploy/start-demo.sh`. Accounts, requests and attachments may be lost on shutdown, restart or redeploy. `MIDWAY_DEMO_MODE=true` exposes this limitation in the interface. Use fictional data and prepare it shortly before the presentation. Setup remains token-protected.
+
+Read [deploy/README.md](deploy/README.md) for manual **Web Service → Free** deployment. Provider eligibility and card verification cannot be guaranteed. Do not add a paid disk or subscription for the demo.
+
+The paid configuration is retained in `deploy/render-paid.yaml`, with instructions in [deploy/PAID.md](deploy/PAID.md). Moving to persistent storage requires explicit data migration; upgrading the plan alone does not migrate the database. Separate client companies require isolated service/database instances; this app is single-branch, not multi-tenant.
+
+No actual Render deployment or paid service has been created. The user has a Render account. Source is on the dedicated GitHub branch; verify its remote tip before deploying.

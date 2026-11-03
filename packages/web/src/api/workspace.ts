@@ -50,6 +50,7 @@ app.get("/session", async (c) => {
     needsSetup: Number(count.rows[0].n) === 0,
     setupEnabled: process.env.MIDWAY_ALLOW_SETUP === "true",
     setupTokenRequired: !!process.env.MIDWAY_SETUP_TOKEN,
+    demoMode: process.env.MIDWAY_DEMO_MODE === "true",
   });
 });
 app.post("/setup", async (c) => {

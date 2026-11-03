@@ -10,6 +10,7 @@ async def main(setup_token=None):
   context=await browser.new_context(viewport={'width':1440,'height':1050})
   page=await context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
   await page.goto(BASE)
+  if os.environ.get('MIDWAY_DEMO_MODE')=='true': await page.get_by_label('نسخة عرض مؤقتة',exact=True).wait_for()
   await page.get_by_label('اسم مدير الفرع',exact=True).fill('مدير الفرع التجريبي')
   await page.get_by_label('البريد الإلكتروني',exact=True).fill('branch-ui@example.invalid')
   await page.get_by_label('كلمة المرور',exact=True).fill(password)
