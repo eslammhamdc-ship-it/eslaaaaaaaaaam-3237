@@ -1,3 +1,4 @@
+import { setting } from "./runtime";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import type { Context } from "hono";
 import { createHash, randomBytes } from "node:crypto";
@@ -22,6 +23,7 @@ export async function sessionUser(headers: Headers): Promise<User | null> {
   return (r.rows[0] as unknown as User) || null;
 }
 export async function issueSession(c: Context, id: string) {
+  await sql.execute({ sql: "DELETE FROM sessions WHERE expires<=?", args: [Date.now()] });
   const token = randomBytes(32).toString("hex");
   await sql.execute({
     sql: "INSERT INTO sessions VALUES (?,?,?)",
@@ -30,8 +32,7 @@ export async function issueSession(c: Context, id: string) {
   setCookie(c, "midway_session", token, {
     httpOnly: true,
     sameSite: "Strict",
-    secure:
-      process.env.MIDWAY_SECURE_COOKIES === "true" || new URL(c.req.url).protocol === "https:",
+    secure: setting("MIDWAY_SECURE_COOKIES") === "true" || new URL(c.req.url).protocol === "https:",
     path: "/",
     maxAge: 8 * 3600,
   });

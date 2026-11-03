@@ -1,5 +1,8 @@
 # Midway branch workspace
 
+**Current target: Cloudflare Workers + D1.** Read [cloudflare/README.md](cloudflare/README.md) for the tested Worker architecture and deployment steps. The Render instructions below are retained for the earlier native Bun variant; they are not the current hosting target.
+
+
 This implementation joins the flight operations UI from this repository with the customer/visit/planning UI from `eslammhamdc-ship-it/eslam-8266` (reviewed commit `a3357bb`). The original repository was inspected, not changed. Customer records and flight company records now share IDs and a single server database.
 
 ## Run
@@ -39,7 +42,7 @@ Use one persistent server instance behind HTTPS, persistent disk for the databas
 
 Company deletion is restricted to the branch manager. Companies with flight requests cannot be deleted; mark them inactive instead. Staff may create customer companies, but can only edit their own customer records. Operations may only be assigned to active flight employees. All roles describe a **single branch**, not a multi-tenant or multi-branch system.
 
-The backend enforces these rules independently of the interface. Passwords use Bun's password hashing; opaque session tokens are stored as SHA-256 hashes, with eight-hour HttpOnly/SameSite cookies. Writes check request origin. Flight history uses the authenticated user's name, and revision checks reject stale operation saves. Refresh after a conflict before retrying. Login attempts are rate-limited per email in the running process.
+The backend enforces these rules independently of the interface. Native passwords use scrypt (with legacy Bun Argon2 verification); the Worker uses the browser PBKDF2 verifier protocol described in cloudflare/README.md; opaque session tokens are stored as SHA-256 hashes, with eight-hour HttpOnly/SameSite cookies. Writes check request origin. Flight history uses the authenticated user's name, and revision checks reject stale operation saves. Refresh after a conflict before retrying. Login attempts are rate-limited per email in the running process.
 
 ## Data and backup
 
@@ -74,10 +77,10 @@ Deployment/public access and initialization with the real branch manager's crede
 
 ## Internet hosting
 
-The default `render.yaml` selects a **free temporary demonstration** without a paid disk, using `deploy/start-demo.sh`. Accounts, requests and attachments may be lost on shutdown, restart or redeploy. `MIDWAY_DEMO_MODE=true` exposes this limitation in the interface. Use fictional data and prepare it shortly before the presentation. Setup remains token-protected.
+The current deployment target is **Cloudflare Workers with static assets and D1**, not Render or Vercel. See [cloudflare/README.md](cloudflare/README.md). Build with `bash deploy/build-cloudflare.sh`; after supplying a real D1 ID and authenticating the target Cloudflare account, deploy with `bash deploy/deploy-cloudflare.sh`.
 
-Read [deploy/README.md](deploy/README.md) for manual **Web Service → Free** deployment. Provider eligibility and card verification cannot be guaranteed. Do not add a paid disk or subscription for the demo.
+The D1 ID in wrangler.jsonc is a local placeholder, not a deployed database. No cloud Worker or D1 database has been created. The user must create/connect a free Cloudflare account and a D1 database. Never request secret values in chat; put MIDWAY_SETUP_TOKEN in Worker Secrets. Free-tier storage, reads/writes, CPU and request limits apply; local tests do not establish a free production SLA or actual remote CPU performance.
 
-The paid configuration is retained in `deploy/render-paid.yaml`, with instructions in [deploy/PAID.md](deploy/PAID.md). Moving to persistent storage requires explicit data migration; upgrading the plan alone does not migrate the database. Separate client companies require isolated service/database instances; this app is single-branch, not multi-tenant.
+Worker data persists in D1 independently of Worker restarts. Native local data remains in `.midway`, with automatic normalization of old operation snapshots. No automatic account/data upload or cross-runtime password migration is performed. Worker attachments are limited to 1 MiB each and 4 MiB per save. Native Bun limits remain 5/20 MiB. Distinct client companies need isolated deployments and databases.
 
-No actual Render deployment or paid service has been created. The user has a Render account. Source is on the dedicated GitHub branch; verify its remote tip before deploying.
+Render free/paid files remain available as earlier alternatives, documented separately in deploy/README.md and deploy/PAID.md. Do not create a paid hosting service for this task.

@@ -1,7 +1,6 @@
 {
   "name": "sandbox-app-template",
   "private": true,
-  "packageManager": "bun@1.3.14",
   "workspaces": [
     "packages/*"
   ],
@@ -20,20 +19,28 @@
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",
     "db:push": "turbo db:push",
-    "internal:kill-port": "lsof -t -i :$(bun --print \"require('./__ports.cjs').website\") | xargs kill -9"
-  },
-  "devDependencies": {
-    "@runablehq/runkit": "0.1.1",
-    "@tursodatabase/api": "^1.9.2",
-    "@types/bun": "1.3.14",
-    "oxfmt": "0.54.0",
-    "turbo": "2.9.18",
-    "typescript": "7.0.1-rc"
+    "internal:kill-port": "lsof -t -i :$(bun --print \"require('./__ports.cjs').website\") | xargs kill -9",
+    "test:workspace": "bun test packages/web/src/api/workspace.test.ts packages/web/src/api/password.test.ts packages/web/src/api/native-migration.test.ts",
+    "test:cloudflare": "python tests/cloudflare_smoke.py",
+    "cf:typecheck": "tsc -p cloudflare/tsconfig.json",
+    "cf:build": "bash deploy/build-cloudflare.sh",
+    "cf:deploy": "bash deploy/deploy-cloudflare.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1023.0",
     "@libsql/client": "^0.17.2",
     "cloudflare": "^5.2.0",
     "pm2": "^7.0.1"
-  }
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261103.1",
+    "@runablehq/runkit": "0.1.1",
+    "@tursodatabase/api": "^1.9.2",
+    "@types/bun": "1.3.14",
+    "oxfmt": "0.54.0",
+    "turbo": "2.9.18",
+    "typescript": "7.0.1-rc",
+    "wrangler": "4.156.2"
+  },
+  "packageManager": "bun@1.3.14"
 }

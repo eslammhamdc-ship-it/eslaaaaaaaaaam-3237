@@ -1,3 +1,4 @@
+import { useWorkspace } from "../lib/workspace";
 import { useEffect, useRef, useState } from "react";
 import {
   X,
@@ -119,6 +120,9 @@ export function RequestForm({
   onClose: () => void;
   onSave: (r: RequestRecord, files: Attachment[]) => Promise<void>;
 }) {
+  const { uploadLimits } = useWorkspace();
+  const fileLimit = uploadLimits?.attachmentBytes || 5 * 1024 * 1024;
+  const totalLimit = uploadLimits?.totalUploadBytes || 20 * 1024 * 1024;
   const [service, setService] = useState(initial?.service ?? "flight");
   const [companyId, setCompanyId] = useState(initial?.companyId ?? "");
   const [companyQuery, setCompanyQuery] = useState("");
@@ -140,11 +144,12 @@ export function RequestForm({
       return;
     }
     if (
-      incoming.some((f) => f.size > 5 * 1024 * 1024) ||
-      incoming.reduce((n, f) => n + f.size, 0) + files.reduce((n, f) => n + f.size, 0) >
-        20 * 1024 * 1024
+      incoming.some((f) => f.size > fileLimit) ||
+      incoming.reduce((n, f) => n + f.size, 0) + files.reduce((n, f) => n + f.size, 0) > totalLimit
     ) {
-      setError("الحد الأقصى 5 MB للملف و20 MB للمرفقات الجديدة.");
+      setError(
+        `الحد الأقصى ${fileLimit / 1024 / 1024} MB للملف و${totalLimit / 1024 / 1024} MB للمرفقات الجديدة.`,
+      );
       return;
     }
     setFiles([...files, ...incoming]);
@@ -443,7 +448,7 @@ export function RequestForm({
           <label className="upload-area">
             <UploadCloud size={26} />
             <strong>اختر مستندًا أو اسحبه هنا</strong>
-            <span>PNG، JPG، WebP، PDF، TXT • حتى 5 MB للملف</span>
+            <span>PNG، JPG، WebP، PDF، TXT • حتى {fileLimit / 1024 / 1024} MB للملف</span>
             <input
               type="file"
               multiple

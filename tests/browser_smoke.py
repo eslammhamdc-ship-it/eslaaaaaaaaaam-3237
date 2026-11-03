@@ -1,10 +1,10 @@
 import asyncio,secrets,os,shutil
 from pathlib import Path
 from playwright.async_api import async_playwright
-BASE='http://localhost:4204'
+BASE=os.environ.get('MIDWAY_TEST_BASE_URL','http://localhost:4204')
 OUT=Path(os.environ.get('MIDWAY_ARTIFACTS','.cache/browser-tests'));OUT.mkdir(parents=True,exist_ok=True)
 async def main(setup_token=None):
- password=secrets.token_urlsafe(24)
+ password=os.environ.get("MIDWAY_TEST_PASSWORD") or secrets.token_urlsafe(24)
  async with async_playwright() as p:
   browser=await p.chromium.launch(executable_path=os.environ.get('MIDWAY_CHROMIUM') or shutil.which('chromium') or shutil.which('google-chrome'),headless=True,args=['--no-sandbox'])
   context=await browser.new_context(viewport={'width':1440,'height':1050})
@@ -77,6 +77,9 @@ async def main(setup_token=None):
   print('PASS: first administrator, account provisioning, CRM company creation, shared flight company, request + attachment, status update, persistence, separate employee session, mobile layout, no JS errors')
   await browser.close()
 if __name__=='__main__':
+ if os.environ.get('MIDWAY_TEST_BASE_URL'):
+  asyncio.run(main(os.environ.get('MIDWAY_TEST_SETUP_TOKEN')))
+  raise SystemExit(0)
  import os,subprocess,tempfile,time,urllib.request
  with tempfile.TemporaryDirectory(prefix='midway-browser-') as temp:
   setup_token=secrets.token_urlsafe(32)

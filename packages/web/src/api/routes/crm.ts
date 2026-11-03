@@ -242,8 +242,11 @@ export const crm = {
         throw new ORPCError("FORBIDDEN", {
           message: "حذف الشركات لمدير الفرع؛ يمكنك تغيير تصنيف الشركة بدلًا من حذفها",
         });
-      const state = await sql.execute("SELECT data FROM operation_state WHERE id=1");
-      if (JSON.parse(String(state.rows[0].data)).requests.some((r: any) => r.companyId === row.id))
+      const related = await sql.execute({
+        sql: "SELECT id FROM flight_requests WHERE company_id=? LIMIT 1",
+        args: [row.id],
+      });
+      if (related.rows.length)
         throw new ORPCError("CONFLICT", {
           message: "الشركة مرتبطة بطلبات طيران. غيّر تصنيفها إلى غير نشطة بدل الحذف لحماية السجلات",
         });

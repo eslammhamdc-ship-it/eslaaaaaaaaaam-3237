@@ -1,29 +1,8 @@
-import type { RouterClient } from "@orpc/server";
+import { sql, db } from "./native-db";
+import { setDefaultDatabase } from "./runtime";
 import { createApp } from "./__core/app";
-import workspace from "./workspace";
-import { crm } from "./routes/crm";
-import { planning } from "./routes/planning";
-import { ping } from "./routes/ping";
-
-// API features are oRPC procedures, one file per feature in ./routes/,
-// composed into this router — typed end-to-end via the clients
-// (web: src/web/lib/api.ts, mobile: lib/api.ts).
-// Keep each routes/ file under 500 lines (`bun run lint` enforces this);
-// split into more feature files as they grow.
-// Patterns and examples: skills/app/references/api.md
-export const router = {
-  ping,
-  crm,
-  planning,
-};
-
-export type AppRouter = typeof router;
-/** Typed client for the router — used by the web and mobile api clients. */
-export type AppRouterClient = RouterClient<AppRouter>;
-
-const app = createApp(router);
-app.route("/api/workspace", workspace);
-// Rare plain-HTTP endpoints (webhooks, streaming, the Better Auth handler)
-// register here with full paths, e.g. app.post("/api/webhooks/example", ...)
-
-export default app;
+import { createWorkspaceApp } from "./app";
+setDefaultDatabase({ sql, db });
+export { router } from "./app";
+export type { AppRouter, AppRouterClient } from "./app";
+export default createWorkspaceApp(createApp);

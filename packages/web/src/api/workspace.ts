@@ -1,3 +1,11 @@
+import {
+  hashPassword,
+  verifyPassword,
+  clientPasswordMode,
+  passwordSalt,
+  PASSWORD_ITERATIONS,
+} from "./password";
+import { setting, uploadLimits } from "./runtime";
 import { Hono } from "hono";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { bodyLimit } from "hono/body-limit";
@@ -24,6 +32,24 @@ const failure = (message: string, status = 400) =>
     status,
     headers: { "Content-Type": "application/json" },
   });
+function handleFailure(error: unknown) {
+  let cause: unknown = error;
+  for (
+    let depth = 0;
+    cause instanceof Error && depth < 6;
+    depth++, cause = (cause as Error).cause
+  ) {
+    if (cause.message.includes("MIDWAY_REVISION_CONFLICT"))
+      return failure("حدث تحديث من مستخدم آخر. أعد تحميل البيانات ثم احفظ مجددًا.", 409);
+  }
+  if (error instanceof Error && error.message === "INVALID_PASSWORD_PROOF")
+    return failure("تعذر تجهيز كلمة المرور؛ أعد تحميل الصفحة وحاول مجددًا");
+  if (error instanceof z.ZodError)
+    return failure("راجع البيانات وحدود المرفقات وكلمة المرور (12 حرفًا على الأقل)");
+  console.error("Workspace request failed:", error instanceof Error ? error.message : "unknown");
+  return failure("تعذر تنفيذ العملية. حاول مرة أخرى.", 500);
+}
+app.onError((error) => handleFailure(error));
 app.use("*", async (c, next) => {
   try {
     c.header("Cache-Control", "no-store");
@@ -36,6 +62,8 @@ app.use("*", async (c, next) => {
     }
     await next();
   } catch (e) {
+    if (e instanceof Error && e.message.includes("MIDWAY_REVISION_CONFLICT"))
+      return failure("حدث تحديث من مستخدم آخر. أعد تحميل البيانات ثم احفظ مجددًا.", 409);
     if (e instanceof z.ZodError)
       return failure("راجع البيانات المطلوبة وصيغة البريد وكلمة المرور (12 حرفًا على الأقل)");
     console.error("Workspace request failed:", e instanceof Error ? e.message : "unknown");
@@ -48,21 +76,23 @@ app.get("/session", async (c) => {
   return c.json({
     user,
     needsSetup: Number(count.rows[0].n) === 0,
-    setupEnabled: process.env.MIDWAY_ALLOW_SETUP === "true",
-    setupTokenRequired: !!process.env.MIDWAY_SETUP_TOKEN,
-    demoMode: process.env.MIDWAY_DEMO_MODE === "true",
+    setupEnabled: setting("MIDWAY_ALLOW_SETUP") === "true",
+    setupTokenRequired: !!setting("MIDWAY_SETUP_TOKEN"),
+    demoMode: setting("MIDWAY_DEMO_MODE") === "true",
+    uploadLimits: uploadLimits(),
+    passwordMode: clientPasswordMode() ? "client-pbkdf2" : "server",
   });
 });
 app.post("/setup", async (c) => {
-  if (process.env.MIDWAY_ALLOW_SETUP !== "true")
+  if (setting("MIDWAY_ALLOW_SETUP") !== "true")
     return failure("إعداد أول مدير غير مفعل على الخادم", 403);
   const body = z
     .object({ setupToken: z.string().max(1024).optional() })
     .passthrough()
     .parse(await c.req.json());
-  const token = process.env.MIDWAY_SETUP_TOKEN;
+  const token = setting("MIDWAY_SETUP_TOKEN");
   if (
-    (process.env.NODE_ENV === "production" || process.env.MIDWAY_SECURE_COOKIES === "true") &&
+    (setting("NODE_ENV") === "production" || setting("MIDWAY_SECURE_COOKIES") === "true") &&
     !token
   )
     return failure("يجب إعداد رمز خاص لإنشاء أول مدير على الإنترنت", 403);
@@ -75,7 +105,7 @@ app.post("/setup", async (c) => {
       return failure("رمز إعداد الفرع غير صحيح", 403);
   }
   const input = account.parse({ ...body, role: "branch_manager" });
-  const password = await Bun.password.hash(input.password);
+  const password = await hashPassword(input.password);
   const id = crypto.randomUUID();
   const result = await sql.execute({
     sql: "INSERT INTO users (id,name,email,password,role) SELECT ?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM users)",
@@ -86,31 +116,49 @@ app.post("/setup", async (c) => {
   await audit(id, "setup", id);
   return c.json({ ok: true });
 });
-// Rate limits persist in memory only; accounts and sessions persist in SQLite.
-const attempts = new Map<string, { count: number; until: number }>();
+app.post("/login-challenge", async (c) => {
+  const { email } = z
+    .object({ email: z.email().transform((value) => value.toLowerCase()) })
+    .parse(await c.req.json());
+  const row = (
+    await sql.execute({
+      sql: "SELECT password FROM users WHERE email=? AND active=1",
+      args: [email],
+    })
+  ).rows[0];
+  const salt =
+    (row && passwordSalt(String(row.password))) ||
+    createHash("sha256")
+      .update(email + "\0" + (setting("MIDWAY_SETUP_TOKEN") || "midway"))
+      .digest("hex")
+      .slice(0, 32);
+  return c.json({ salt, iterations: PASSWORD_ITERATIONS });
+});
 app.post("/login", async (c) => {
   const input = z
     .object({ email: z.email().transform((x) => x.toLowerCase()), password: z.string().max(128) })
     .parse(await c.req.json());
-  const key = input.email;
-  if (attempts.size > 10000)
-    for (const [k, v] of attempts) if (v.until < Date.now()) attempts.delete(k);
-  const attempt = attempts.get(key);
-  if (attempt && attempt.until > Date.now() && attempt.count >= 10)
-    return failure("محاولات كثيرة؛ انتظر 15 دقيقة", 429);
+  const now = Date.now();
+  await sql.execute({
+    sql: "DELETE FROM login_attempts WHERE email IN (SELECT email FROM login_attempts WHERE until<=? LIMIT 100)",
+    args: [now],
+  });
+  const attempt = await sql.execute({
+    sql: `INSERT INTO login_attempts VALUES (?,1,?)
+    ON CONFLICT(email) DO UPDATE SET count=CASE WHEN login_attempts.until<=? THEN 1 ELSE count+1 END,
+    until=CASE WHEN login_attempts.until<=? THEN excluded.until ELSE login_attempts.until END RETURNING count`,
+    args: [input.email, now + 900000, now, now],
+  });
+  if (Number(attempt.rows[0].count) > 10) return failure("محاولات كثيرة؛ انتظر 15 دقيقة", 429);
   const result = await sql.execute({
     sql: "SELECT * FROM users WHERE email=? AND active=1",
     args: [input.email],
   });
   const row = result.rows[0];
-  if (!row || !(await Bun.password.verify(input.password, String(row.password)))) {
-    attempts.set(key, {
-      count: attempt && attempt.until > Date.now() ? attempt.count + 1 : 1,
-      until: attempt && attempt.until > Date.now() ? attempt.until : Date.now() + 900000,
-    });
+  if (!row || !(await verifyPassword(input.password, String(row.password)))) {
     return failure("البريد أو كلمة المرور غير صحيحة", 401);
   }
-  attempts.delete(key);
+  await sql.execute({ sql: "DELETE FROM login_attempts WHERE email=?", args: [input.email] });
   await issueSession(c, String(row.id));
   return c.json({ ok: true });
 });
@@ -124,6 +172,14 @@ app.use("*", async (c, next) => {
   c.set("user", user);
   await next();
 });
+app.get("/password-challenge", async (c) => {
+  const row = (
+    await sql.execute({ sql: "SELECT password FROM users WHERE id=?", args: [c.get("user").id] })
+  ).rows[0];
+  const salt = passwordSalt(String(row.password));
+  if (!salt) return failure("كلمة المرور القديمة تتطلب إعادة تعيين من المدير", 409);
+  return c.json({ salt, iterations: PASSWORD_ITERATIONS });
+});
 app.post("/password", async (c) => {
   const user = c.get("user");
   const input = z
@@ -131,9 +187,9 @@ app.post("/password", async (c) => {
     .parse(await c.req.json());
   const row = (await sql.execute({ sql: "SELECT password FROM users WHERE id=?", args: [user.id] }))
     .rows[0];
-  if (!(await Bun.password.verify(input.current, String(row.password))))
+  if (!(await verifyPassword(input.current, String(row.password))))
     return failure("كلمة المرور الحالية غير صحيحة", 403);
-  const password = await Bun.password.hash(input.password);
+  const password = await hashPassword(input.password);
   await sql.batch(
     [
       { sql: "UPDATE users SET password=? WHERE id=?", args: [password, user.id] },
@@ -156,7 +212,7 @@ app.post("/users", async (c) => {
   if (actor.role !== "branch_manager") return failure("إدارة الحسابات لمدير الفرع", 403);
   const input = account.parse(await c.req.json());
   const id = crypto.randomUUID(),
-    password = await Bun.password.hash(input.password);
+    password = await hashPassword(input.password);
   try {
     await sql.execute({
       sql: "INSERT INTO users (id,name,email,password,role) VALUES (?,?,?,?,?)",
@@ -180,7 +236,7 @@ app.patch("/users/:id", async (c) => {
     })
     .parse(await c.req.json());
   if (id === actor.id) return failure("لا يمكن تغيير صلاحيات حسابك أو إيقافه من هنا");
-  const password = input.password ? await Bun.password.hash(input.password) : null;
+  const password = input.password ? await hashPassword(input.password) : null;
   const r = await sql.execute({
     sql: "UPDATE users SET active=?,role=?,password=COALESCE(?,password) WHERE id=?",
     args: [Number(input.active), input.role, password, id],
@@ -207,7 +263,11 @@ function canOperate(user: User, employeeId: string) {
   );
 }
 async function state() {
-  return (await sql.execute("SELECT revision,data FROM operation_state WHERE id=1")).rows[0];
+  const state = (await sql.execute("SELECT revision,data FROM operation_state WHERE id=1")).rows[0];
+  const requests = (await sql.execute("SELECT data FROM flight_requests")).rows.map((r) =>
+    JSON.parse(String(r.data)),
+  );
+  return { revision: state.revision, data: JSON.stringify({ requests }) };
 }
 async function companies() {
   return (await sql.execute("SELECT id,data FROM crm_records WHERE kind='company'")).rows.map(
@@ -303,12 +363,8 @@ app.post("/operations", async (c) => {
               "application/pdf",
               "text/plain",
             ]),
-            size: z
-              .number()
-              .int()
-              .min(0)
-              .max(5 * 1024 * 1024),
-            data: z.string().max(7 * 1024 * 1024),
+            size: z.number().int().min(0).max(uploadLimits().attachmentBytes),
+            data: z.string().max(Math.ceil((uploadLimits().attachmentBytes * 4) / 3) + 4),
             createdAt: z.iso.datetime(),
           }),
         )
@@ -322,7 +378,9 @@ app.post("/operations", async (c) => {
       await tx.rollback();
       return failure("حدث تحديث من مستخدم آخر. أعد تحميل البيانات ثم احفظ مجددًا.", 409);
     }
-    const old = JSON.parse(String(s.data)).requests as any[];
+    const old = (await tx.execute("SELECT data FROM flight_requests")).rows.map((r) =>
+      JSON.parse(String(r.data)),
+    ) as any[];
     const merged = new Map(old.map((r) => [r.id, r]));
     const companyRows = (
       await tx.execute("SELECT id,owner_id,data FROM crm_records WHERE kind='company'")
@@ -462,7 +520,7 @@ app.post("/operations", async (c) => {
         !canOperate(user, request.employeeId) ||
         !request.attachmentIds.includes(file.id) ||
         data.length !== file.size ||
-        bytes > 20 * 1024 * 1024
+        bytes > uploadLimits().totalUploadBytes
       ) {
         await tx.rollback();
         return failure("المرفق غير صالح أو تجاوز الحد المسموح");
@@ -472,10 +530,25 @@ app.post("/operations", async (c) => {
         args: [file.id, file.requestId, file.name, file.type, file.size, data, file.createdAt],
       });
     }
+    for (const [id, request] of merged) {
+      if (
+        old.some((before) => before.id === id && JSON.stringify(before) === JSON.stringify(request))
+      )
+        continue;
+      const serialized = JSON.stringify(request);
+      if (Buffer.byteLength(serialized) > uploadLimits().recordBytes) {
+        await tx.rollback();
+        return failure("الطلب كبير جدًا؛ قلّل الملاحظات أو سجل النشاط");
+      }
+      writes.push({
+        sql: "INSERT INTO flight_requests VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET employee_id=excluded.employee_id,company_id=excluded.company_id,data=excluded.data",
+        args: [id, request.employeeId, request.companyId, serialized],
+      });
+    }
     for (const write of writes) await tx.execute(write);
     await tx.execute({
-      sql: "UPDATE operation_state SET revision=revision+1,data=? WHERE id=1",
-      args: [JSON.stringify({ requests: [...merged.values()] })],
+      sql: "UPDATE operation_state SET revision=revision+1 WHERE id=1",
+      args: [],
     });
     await tx.commit();
     return c.json({ ok: true });
